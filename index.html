@@ -1,19 +1,23 @@
 <meta charset=utf-8><meta name=viewport content="width=device-width"><title>Показ экрана</title>
-<style>body{font:16px system-ui;max-width:640px;margin:20px auto;padding:0 12px;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#14171c;color:#eee}}textarea,video{width:100%}textarea{height:90px}button{padding:8px 14px;margin:4px 4px 4px 0}</style>
+<style>body{font:16px system-ui;max-width:640px;margin:20px auto;padding:0 12px;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#14171c;color:#eee}}textarea,video{width:100%}textarea{height:50px}button{padding:8px 14px;margin:4px 4px 4px 0}</style>
 <h2>Показ экрана (только просмотр)</h2><b id=s>Ожидание</b>
 <h3>Показываю я</h3>
-<button id=a>1. Поделиться экраном</button><textarea id=o readonly placeholder="Код: отправьте зрителю"></textarea>
+<button id=a>1. Поделиться экраном</button><textarea id=o readonly placeholder="Короткий код: отправьте зрителю"></textarea>
 <textarea id=r placeholder="Ответный код от зрителя"></textarea><button id=b>3. Разрешить просмотр</button>
 <h3>Смотрю я</h3>
 <textarea id=i placeholder="Код от показывающего"></textarea><button id=c>2. Создать ответный код</button>
 <textarea id=u readonly placeholder="Ответный код: отправьте обратно"></textarea><video id=v autoplay playsinline controls muted></video>
 <script>
 let p,$=i=>document.getElementById(i),S=t=>$("s").textContent=t,
-E=d=>btoa(unescape(encodeURIComponent(JSON.stringify(d)))),
-D=t=>JSON.parse(decodeURIComponent(escape(atob(t.trim())))),
+F=h=>btoa(String.fromCharCode(...h.split(":").map(x=>parseInt(x,16)))).replace(/=/g,""),
+G=b=>[...atob(b)].map(c=>c.charCodeAt(0).toString(16).padStart(2,0).toUpperCase()).join(":"),
+X=s=>{let m=r=>(s.match(r)||[])[1];return[m(/a=ice-ufrag:(\S+)/),m(/a=ice-pwd:(\S+)/),F(m(/a=fingerprint:sha-256 (\S+)/)),...[...s.matchAll(/a=candidate:\S+ 1 udp \d+ (\d+)\.(\d+)\.(\d+)\.(\d+) (\d+) typ/g)].map(c=>btoa(String.fromCharCode(c[1],c[2],c[3],c[4],c[5]>>8,c[5]&255)))]},
+C=k=>k.map((t,i)=>{let a=[...atob(t)].map(x=>x.charCodeAt(0));return`a=candidate:${i+1} 1 udp ${2e9-i} ${a.slice(0,4).join(".")} ${a[4]<<8|a[5]} typ host`}),
+O=k=>["v=0","o=- 1 1 IN IP4 127.0.0.1","s=-","t=0 0","a=group:BUNDLE 0",`m=video 9 UDP/TLS/RTP/SAVPF ${k[0]}`,"c=IN IP4 0.0.0.0",`a=ice-ufrag:${k[1]}`,`a=ice-pwd:${k[2]}`,`a=fingerprint:sha-256 ${G(k[3])}`,"a=setup:actpass","a=mid:0","a=sendonly","a=rtcp-mux",`a=rtpmap:${k[0]} VP8/90000`,`a=rtcp-fb:${k[0]} nack`,`a=rtcp-fb:${k[0]} nack pli`,`a=rtcp-fb:${k[0]} goog-remb`,...C(k.slice(4))].join("\r\n")+"\r\n",
+A=(s,k)=>s.split("\r\n").filter(l=>l&&!/^a=(candidate|end-of-candidates|ssrc|msid)/.test(l)).map(l=>/^a=ice-ufrag/.test(l)?"a=ice-ufrag:"+k[0]:/^a=ice-pwd/.test(l)?"a=ice-pwd:"+k[1]:/^a=fingerprint/.test(l)?"a=fingerprint:sha-256 "+G(k[2]):l=="a=setup:actpass"?"a=setup:active":l=="a=sendonly"?"a=recvonly":l).concat(C(k.slice(3))).join("\r\n")+"\r\n",
 N=()=>(p=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]}),p.onconnectionstatechange=()=>S(p.connectionState),p),
 W=()=>new Promise(r=>{p.onicegatheringstatechange=()=>p.iceGatheringState=="complete"&&r();setTimeout(r,4e3)});
-$("a").onclick=async()=>{try{let m=await navigator.mediaDevices.getDisplayMedia({video:1});N();m.getTracks().forEach(t=>p.addTrack(t,m));await p.setLocalDescription(await p.createOffer());await W();$("o").value=E(p.localDescription);S("Отправьте код зрителю")}catch(e){S(e.message)}};
-$("b").onclick=()=>p.setRemoteDescription(D($("r").value)).catch(e=>S("Неверный код"));
-$("c").onclick=async()=>{try{N();p.ontrack=e=>$("v").srcObject=e.streams[0];await p.setRemoteDescription(D($("i").value));await p.setLocalDescription(await p.createAnswer());await W();$("u").value=E(p.localDescription);S("Отправьте ответный код")}catch(e){S("Неверный код")}};
+$("a").onclick=async()=>{try{let m=await navigator.mediaDevices.getDisplayMedia({video:1});N();m.getTracks().forEach(t=>p.addTrack(t,m));p.getTransceivers().forEach(t=>{t.direction="sendonly";t.setCodecPreferences(RTCRtpReceiver.getCapabilities("video").codecs.filter(c=>c.mimeType=="video/VP8"))});await p.setLocalDescription(await p.createOffer());await W();let s=p.localDescription.sdp;$("o").value=[s.match(/a=rtpmap:(\d+) VP8/)[1],...X(s)].join(".");S("Отправьте код зрителю")}catch(e){S(e.message)}};
+$("b").onclick=async()=>{try{await p.setRemoteDescription({type:"answer",sdp:A(p.localDescription.sdp,$("r").value.trim().split("."))})}catch(e){S("Неверный код")}};
+$("c").onclick=async()=>{try{N();p.ontrack=e=>$("v").srcObject=new MediaStream([e.track]);await p.setRemoteDescription({type:"offer",sdp:O($("i").value.trim().split("."))});await p.setLocalDescription(await p.createAnswer());await W();$("u").value=X(p.localDescription.sdp).join(".");S("Отправьте ответный код")}catch(e){S("Неверный код")}};
 </script>
