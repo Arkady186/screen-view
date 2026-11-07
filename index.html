@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Показ экрана</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5d6673;
+    --line: #dde1e7; --accent: #2563eb; --accent-text: #ffffff;
+    --ok: #15803d; --warn: #b45309; --err: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a; --card: #1b2028; --text: #e8ebf0; --muted: #98a2b0;
+      --line: #2e3540; --accent: #4f8cff; --accent-text: #0b1220;
+      --ok: #4ade80; --warn: #fbbf24; --err: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 12px; border: 1px solid var(--line); background: var(--card);
+    color: var(--text); border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; }
+  .tab[aria-selected="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; margin-bottom: 16px; }
+  .step { display: flex; gap: 10px; align-items: baseline; font-weight: 600; margin: 0 0 8px; }
+  .num { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-text); font-size: 14px; flex: none; }
+  textarea { width: 100%; min-height: 96px; resize: vertical; padding: 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    font: 13px/1.4 ui-monospace, Consolas, monospace; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  button.btn { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .status { padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line);
+    font-weight: 600; margin-bottom: 16px; }
+  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.err { color: var(--err); }
+  video { width: 100%; background: #000; border-radius: 10px; max-height: 70vh; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Показ экрана</h1>
+  <p class="sub">Прямое соединение между двумя компьютерами. Только просмотр, без управления и без серверов.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-host" role="tab" aria-selected="true">Я показываю свой экран</button>
+    <button class="tab" id="tab-view" role="tab" aria-selected="false">Я смотрю чужой экран</button>
+  </div>
+
+  <div id="status" class="status">Ожидание</div>
+
+  <!-- ===== Показывающий ===== -->
+  <section id="host">
+    <div class="card">
+      <p class="step"><span class="num">1</span> Выберите, что показать</p>
+      <p class="hint">Браузер сам спросит, какой экран или окно показывать. Пока вы не подтвердите, ничего не передаётся.</p>
+      <div class="row"><button class="btn primary" id="h-start">Поделиться экраном</button></div>
+    </div>
+    <div class="card">
+      <p class="step"><span class="num">2</span> Отправьте этот код зрителю</p>
+      <textarea id="h-offer" readonly placeholder="Код появится после шага 1"></textarea>
+      <div class="row"><button class="btn" id="h-copy" disabled>Скопировать код</button></div>
+    </div>
+    <div class="card">
+      <p class="step"><span class="num">3</span> Вставьте ответный код от зрителя</p>
+      <textarea id="h-answer" placeholder="Вставьте сюда код, который пришлёт зритель"></textarea>
+      <div class="row">
+        <button class="btn primary" id="h-connect" disabled>Разрешить просмотр</button>
+        <button class="btn" id="h-stop" disabled>Остановить показ</button>
+      </div>
+      <p class="hint">Зритель увидит экран только после вашего нажатия «Разрешить просмотр».</p>
+    </div>
+  </section>
+
+  <!-- ===== Зритель ===== -->
+  <section id="view" class="hidden">
+    <div class="card">
+      <p class="step"><span class="num">1</span> Вставьте код от того, кто показывает экран</p>
+      <textarea id="v-offer" placeholder="Вставьте сюда код"></textarea>
+      <div class="row"><button class="btn primary" id="v-make">Создать ответный код</button></div>
+    </div>
+    <div class="card">
+      <p class="step"><span class="num">2</span> Отправьте этот ответный код обратно</p>
+      <textarea id="v-answer" readonly placeholder="Ответный код появится после шага 1"></textarea>
+      <div class="row"><button class="btn" id="v-copy" disabled>Скопировать код</button></div>
+      <p class="hint">Когда показывающий нажмёт «Разрешить просмотр», экран появится ниже.</p>
+    </div>
+    <div class="card">
+      <video id="v-video" autoplay playsinline controls muted></video>
+      <div class="row"><button class="btn" id="v-full" disabled>На весь экран</button></div>
+    </div>
+  </section>
+
+  <footer>Соединение идёт напрямую между браузерами (WebRTC) и шифруется. Для поиска пути через роутеры используется
+    бесплатный STUN-сервер Google; изображение через него не проходит. Если у обоих очень строгие роутеры, соединение может не установиться.</footer>
+</main>
+
+<script>
+"use strict";
+const ICE = { iceServers: [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" }
+] };
+const $ = (id) => document.getElementById(id);
+let pc = null, stream = null;
+
+function setStatus(text, kind) {
+  const s = $("status");
+  s.textContent = text;
+  s.className = "status" + (kind ? " " + kind : "");
+}
+function encode(desc) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify({ t: desc.type, s: desc.sdp }))));
+}
+function decode(text) {
+  const o = JSON.parse(decodeURIComponent(escape(atob(text.replace(/\s+/g, "")))));
+  return { type: o.t, sdp: o.s };
+}
+function waitIce(conn) {
+  return new Promise((resolve) => {
+    if (conn.iceGatheringState === "complete") return resolve();
+    const done = () => { conn.removeEventListener("icegatheringstatechange", check); resolve(); };
+    const check = () => { if (conn.iceGatheringState === "complete") done(); };
+    conn.addEventListener("icegatheringstatechange", check);
+    setTimeout(done, 5000);
+  });
+}
+async function copyFrom(id, btn) {
+  const el = $(id);
+  try { await navigator.clipboard.writeText(el.value); }
+  catch (e) { el.select(); document.execCommand("copy"); }
+  const old = btn.textContent;
+  btn.textContent = "Скопировано";
+  setTimeout(() => (btn.textContent = old), 1500);
+}
+function watchState(conn, who) {
+  conn.onconnectionstatechange = () => {
+    const st = conn.connectionState;
+    if (st === "connected") setStatus(who === "host" ? "Зритель подключён, экран показывается" : "Подключено", "ok");
+    else if (st === "connecting") setStatus("Соединяемся…", "warn");
+    else if (st === "failed") setStatus("Не удалось соединиться. Возможно, роутер блокирует прямое соединение. Попробуйте заново или Tailscale.", "err");
+    else if (st === "disconnected" || st === "closed") setStatus("Соединение завершено", "warn");
+  };
+}
+
+/* ---- вкладки ---- */
+function showTab(host) {
+  $("host").classList.toggle("hidden", !host);
+  $("view").classList.toggle("hidden", host);
+  $("tab-host").setAttribute("aria-selected", host);
+  $("tab-view").setAttribute("aria-selected", !host);
+}
+$("tab-host").onclick = () => showTab(true);
+$("tab-view").onclick = () => showTab(false);
+
+/* ---- показывающий ---- */
+function stopHost() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (pc) pc.close();
+  stream = null; pc = null;
+  $("h-offer").value = ""; $("h-answer").value = "";
+  $("h-copy").disabled = true; $("h-connect").disabled = true; $("h-stop").disabled = true;
+  $("h-start").disabled = false;
+  setStatus("Показ остановлен", "warn");
+}
+$("h-start").onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 20 }, audio: false });
+  } catch (e) {
+    setStatus("Показ не разрешён: " + e.message, "err");
+    return;
+  }
+  $("h-start").disabled = true;
+  setStatus("Готовим код…", "warn");
+  pc = new RTCPeerConnection(ICE);
+  watchState(pc, "host");
+  stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+  stream.getVideoTracks()[0].onended = stopHost; // нажали «Прекратить доступ» в браузере
+  await pc.setLocalDescription(await pc.createOffer());
+  await waitIce(pc);
+  $("h-offer").value = encode(pc.localDescription);
+  $("h-copy").disabled = false; $("h-connect").disabled = false; $("h-stop").disabled = false;
+  setStatus("Отправьте код зрителю и дождитесь его ответного кода", "warn");
+};
+$("h-copy").onclick = () => copyFrom("h-offer", $("h-copy"));
+$("h-connect").onclick = async () => {
+  try {
+    await pc.setRemoteDescription(decode($("h-answer").value));
+    setStatus("Соединяемся…", "warn");
+  } catch (e) {
+    setStatus("Ответный код неверный. Скопируйте его целиком.", "err");
+  }
+};
+$("h-stop").onclick = stopHost;
+
+/* ---- зритель ---- */
+$("v-make").onclick = async () => {
+  try {
+    const offer = decode($("v-offer").value);
+    pc = new RTCPeerConnection(ICE);
+    watchState(pc, "view");
+    pc.ontrack = (ev) => {
+      $("v-video").srcObject = ev.streams[0];
+      $("v-full").disabled = false;
+    };
+    await pc.setRemoteDescription(offer);
+    await pc.setLocalDescription(await pc.createAnswer());
+    await waitIce(pc);
+    $("v-answer").value = encode(pc.localDescription);
+    $("v-copy").disabled = false;
+    setStatus("Отправьте ответный код и ждите разрешения", "warn");
+  } catch (e) {
+    setStatus("Код неверный. Скопируйте его целиком.", "err");
+  }
+};
+$("v-copy").onclick = () => copyFrom("v-answer", $("v-copy"));
+$("v-full").onclick = () => $("v-video").requestFullscreen && $("v-video").requestFullscreen();
+
+if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+  $("h-start").disabled = true;
+  setStatus("Показ экрана не поддерживается этим браузером. Используйте Chrome или Edge на компьютере. Просмотр работает везде.", "warn");
+}
+</script>
+</body>
+</html>
